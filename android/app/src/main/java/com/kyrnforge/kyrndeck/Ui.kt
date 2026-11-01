@@ -162,7 +162,7 @@ private fun Deck(store: Store, reloadKey: Int) {
         }
         val all = apps.orEmpty()
         Column(Modifier.fillMaxSize()) {
-            StatusStrip(store, all, layout) { manualChecks++ }
+            StatusStrip(store, all, layout) { manualChecks++; toast = "Buscando actualizaciones" }
             if (layout == Layout.NARROW) FilterTabs(store, all)
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 when (layout) {
