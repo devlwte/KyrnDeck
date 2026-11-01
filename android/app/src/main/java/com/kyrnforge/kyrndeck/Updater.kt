@@ -209,7 +209,7 @@ fun UpdatePrompt(manualChecks: Int, onInfo: (String) -> Unit) {
         null -> {}
         is UpdateState.Found -> UpdateDialog(
             title = "KyrnDeck ${s.r.version}",
-            text = "Hay una versión nueva" + (if (s.r.size > 0) ", ${bytes(s.r.size)}." else "."),
+            text = "Tienes la ${appVersion(ctx)}. La nueva ocupa " + (if (s.r.size > 0) "${bytes(s.r.size)}." else "poco."),
             notes = s.r.notes,
             ok = "Actualizar", onOk = { start(s.r) }, cancel = "Más tarde", onCancel = { state = null }
         )

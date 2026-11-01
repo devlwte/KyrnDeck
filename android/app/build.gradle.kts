@@ -21,8 +21,8 @@ android {
         applicationId = "com.kyrnforge.kyrndeck"
         minSdk = 29
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.5.2"
+        versionCode = 10
+        versionName = "0.5.3"
 
         // Se puede apuntar a otro servidor para probar: -PupdateUrl=http://...
         val updateUrl = (project.findProperty("updateUrl") as String?)
