@@ -46,9 +46,9 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-// Al abrir la app mira GitHub Releases, como mucho una vez cada 4 horas.
+// Mira GitHub Releases al abrir la app y al volver a ella, como mucho cada 15 minutos.
 // Desde la barra de arriba (el número de versión) se puede buscar a mano.
-private const val EVERY_MS = 4 * 60 * 60 * 1000L
+private const val EVERY_MS = 15 * 60 * 1000L
 
 data class Release(val version: String, val apkUrl: String, val size: Long, val notes: String)
 
@@ -173,23 +173,38 @@ fun appVersion(ctx: Context): String =
     runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "0"
 
 @Composable
-fun UpdatePrompt(manualChecks: Int, onInfo: (String) -> Unit) {
+fun UpdatePrompt(autoChecks: Int, manualChecks: Int, reopen: Int, onAvailable: (String?) -> Unit, onInfo: (String) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<UpdateState?>(null) }
+    // La versión encontrada se recuerda para el botón de la barra, aunque se cierre el aviso.
+    var found by remember { mutableStateOf<Release?>(null) }
+    var lastManual by remember { mutableStateOf(0) }
 
-    LaunchedEffect(manualChecks) {
-        val manual = manualChecks > 0
+    LaunchedEffect(autoChecks, manualChecks) {
+        val manual = manualChecks != lastManual
+        lastManual = manualChecks
         val prefs = ctx.getSharedPreferences("kyrndeck_update", Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         if (!manual && now - prefs.getLong("last_check", 0) < EVERY_MS) return@LaunchedEffect
         prefs.edit().putLong("last_check", now).apply()
         when (val result = withContext(Dispatchers.IO) { check(appVersion(ctx)) }) {
-            is Check.Found -> state = UpdateState.Found(result.r)
-            Check.UpToDate -> if (manual) onInfo("Tienes la última versión")
+            is Check.Found -> {
+                // El aviso salta solo la primera vez que aparece cada versión; después queda el botón.
+                if (manual || found?.version != result.r.version) state = UpdateState.Found(result.r)
+                found = result.r
+                onAvailable(result.r.version)
+            }
+            Check.UpToDate -> {
+                found = null
+                onAvailable(null)
+                if (manual) onInfo("Tienes la última versión")
+            }
             Check.Offline -> if (manual) onInfo("No se pudo conectar con GitHub")
         }
     }
+
+    LaunchedEffect(reopen) { if (reopen > 0) found?.let { state = UpdateState.Found(it) } }
 
     fun start(r: Release) {
         state = UpdateState.Downloading(r, 0f)

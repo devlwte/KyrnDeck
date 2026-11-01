@@ -130,6 +130,8 @@ private fun Deck(store: Store, reloadKey: Int) {
     var sys by remember { mutableStateOf<Map<String, Pair<Long, Long>>>(emptyMap()) }
     var sysOk by remember { mutableStateOf(true) }
     var manualChecks by remember { mutableStateOf(0) }
+    var reopenUpdate by remember { mutableStateOf(0) }
+    var available by remember { mutableStateOf<String?>(null) }
     val usage = remember(sys, store.usage.toMap()) { SystemUsage.merge(store.usage.toMap(), sys) }
 
     LaunchedEffect(reloadKey) {
@@ -162,7 +164,10 @@ private fun Deck(store: Store, reloadKey: Int) {
         }
         val all = apps.orEmpty()
         Column(Modifier.fillMaxSize()) {
-            StatusStrip(store, all, layout) { manualChecks++; toast = "Buscando actualizaciones" }
+            StatusStrip(store, all, layout, available, onUpdate = { reopenUpdate++ }) {
+                manualChecks++
+                toast = "Buscando actualizaciones"
+            }
             if (layout == Layout.NARROW) FilterTabs(store, all)
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 when (layout) {
@@ -186,7 +191,7 @@ private fun Deck(store: Store, reloadKey: Int) {
             }
         }
 
-        UpdatePrompt(manualChecks) { toast = it }
+        UpdatePrompt(reloadKey, manualChecks, reopenUpdate, onAvailable = { available = it }) { toast = it }
 
         AnimatedVisibility(
             visible = toast != null,
@@ -207,7 +212,10 @@ private fun Deck(store: Store, reloadKey: Int) {
 // Barra superior
 
 @Composable
-private fun StatusStrip(store: Store, apps: List<AppEntry>, layout: Layout, onVersion: () -> Unit) {
+private fun StatusStrip(
+    store: Store, apps: List<AppEntry>, layout: Layout,
+    available: String?, onUpdate: () -> Unit, onVersion: () -> Unit,
+) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -236,6 +244,7 @@ private fun StatusStrip(store: Store, apps: List<AppEntry>, layout: Layout, onVe
         if (layout != Layout.NARROW) Readout("Libre", bytes(free))
         Readout(if (charging) "Cargando" else "Batería", "$battery%", if (battery <= 20 && !charging) p.red else p.ink)
         BasicText(SimpleDateFormat("HH:mm", ES).format(Date(now)), style = cond(20.sp, p.ink), modifier = Modifier.padding(end = 12.dp))
+        if (available != null) UpdateButton(available, layout != Layout.NARROW, onUpdate)
         ThemeButton(store)
     }
 }
@@ -249,10 +258,40 @@ private fun VersionTag(onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val hover by src.collectIsHoveredAsState()
     BasicText(
-        version, style = cond(12.sp, if (hover) p.accent else p.faint, FontWeight.Bold),
-        modifier = Modifier.padding(start = 8.dp).clip(R4).hoverable(src).clickable(src, null, onClick = onClick)
-            .padding(horizontal = 5.dp, vertical = 3.dp)
+        "v$version", style = cond(12.sp, if (hover) p.ink else p.muted, FontWeight.Bold),
+        modifier = Modifier.padding(start = 8.dp).clip(R4)
+            .border(1.dp, if (hover) p.lineStrong else p.line, R4)
+            .hoverable(src).clickable(src, null, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
     )
+}
+
+// Aparece cuando hay una versión nueva y se queda hasta que se instala.
+@Composable
+private fun UpdateButton(version: String, wide: Boolean, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    val src = remember { MutableInteractionSource() }
+    val hover by src.collectIsHoveredAsState()
+    Row(
+        Modifier.padding(end = 10.dp).height(32.dp).clip(R4)
+            .background(if (hover) p.accent.copy(alpha = 0.85f) else p.accent)
+            .hoverable(src).clickable(src, null, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Canvas(Modifier.size(12.dp)) {
+            val w = 1.8.dp.toPx()
+            drawLine(p.onAccent, Offset(size.width / 2, 0f), Offset(size.width / 2, size.height * 0.7f), w)
+            drawLine(p.onAccent, Offset(size.width * 0.2f, size.height * 0.42f), Offset(size.width / 2, size.height * 0.72f), w)
+            drawLine(p.onAccent, Offset(size.width * 0.8f, size.height * 0.42f), Offset(size.width / 2, size.height * 0.72f), w)
+            drawLine(p.onAccent, Offset(0f, size.height), Offset(size.width, size.height), w)
+        }
+        Spacer(Modifier.width(8.dp))
+        BasicText(
+            if (wide) "Actualizar a $version" else version,
+            style = cond(14.sp, p.onAccent, FontWeight.Bold, 0.04.em)
+        )
+    }
 }
 
 @Composable
